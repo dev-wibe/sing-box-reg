@@ -23,7 +23,7 @@ regex:.*(android|googleapis|gvt1|gvt2|gstatic)\.com$
 regex:.*(apple|icloud|mzstatic|itunes)\.com$
 regex:.*(nvidia|geforce)\.com$
 regex:.*(yandex|ya|dzeninfra|dzen|kinopoisk|yastatic|yandex\.net|yandex\.cloud|s3\.yandex|strm\.yandex|monium|yandexadexchange|passport|mobileproxy|delivery-club|eda\.yandex|market\.yandex|maps\.yandex|yandex-team|yandextaxi)\.(ru|net|cloud|kz|fi|by|uz)$
-regex:.*(vk|vkusvill|vkvideo|vkuserphoto|my\.games|odnoklassniki|ok|mail|internet|imgs|vk-portal|okcdn|vk-analytics|oneme)\.(ru|com|me|cloud)$
+regex:(^|\.)(vk|vkusvill|vkvideo|vkuserphoto|my\.games|odnoklassniki|ok|mail|internet|imgs|vk-portal|okcdn|vk-analytics|oneme)\.(ru|com|me|cloud)$
 regex:.*(rustore)\.ru$
 regex:.*(rutube|rutubelist|rtbcdn)\.(ru|net)$
 regex:.*(ivi|ivi\.tv)\.(ru|tv)$
