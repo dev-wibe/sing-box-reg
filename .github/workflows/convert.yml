@@ -18,16 +18,15 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.23'
+          cache: true # Включает встроенный кэш Go для ускорения
 
       - name: Initialize Go module & Install sing-box
         run: |
-          # Инициализируем временный модуль, чтобы go install отработал без ошибок go.sum
           go mod init srs-compiler || true
           go install -v github.com/sagernet/sing-box/cmd/sing-box@latest
 
       - name: Compile rules.txt to bypass.srs
         run: |
-          # Компилируем правила в бинарный формат
           $(go env GOPATH)/bin/sing-box rule-set compile rules.txt -o bypass.srs
 
       - name: Commit and Push generated .srs file
