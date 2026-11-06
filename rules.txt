@@ -40,3 +40,11 @@ regex:.*(kaspersky-labs)\.com$
 regex:.*(mindbox)\.ru$
 regex:.*(moengage|appsflyersdk|buzzoola)\.com$
 regex:.*(uni\.rest)$
+regex:(^|\.)serving-sys\.ru$
+regex:(^|\.)telecid\.ru$
+regex:(^|\.)kinescopecdn\.net$
+regex:^magnit\.streamerce\.live$
+regex:(^|\.)okolo\.app$
+regex:(^|\.)tns-counter\.ru$
+regex:(^|\.)adriver\.ru$
+regex:^storage\.yandexcloud\.net$
