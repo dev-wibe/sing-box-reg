@@ -2,10 +2,14 @@ name: Compile sing-box SRS
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
     paths:
-      - 'rules.txt'
+      - rules.txt
+      - .github/workflows/convert.yml
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -17,22 +21,68 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version: '1.23'
-          cache: false # Отключаем поиск go.sum / go.mod
+          go-version: stable
+          check-latest: true
+          cache: false
 
-      - name: Install and Compile sing-box
-        run: |
-          # Устанавливаем компилятор во временной директории, не трогая корень репозитория
-          GOBIN=$(pwd) go install github.com/sagernet/sing-box/cmd/sing-box@latest
-          
-          # Запускаем компиляцию rules.txt в bypass.srs
-          ./sing-box rule-set compile rules.txt -o bypass.srs
+      - name: Install sing-box
+        run: GOBIN="$RUNNER_TEMP" go install github.com/sagernet/sing-box/cmd/sing-box@latest
 
-      - name: Commit and Push generated .srs file
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Convert rules.txt to sing-box rule-set
         run: |
-          git config --global user.name "GitHub Actions Bot"
-          git config --global user.email "actions@github.com"
+          python3 - <<'PY'
+          import ipaddress
+          import json
+          from pathlib import Path
+
+          ip_cidrs = []
+          domain_regex = []
+
+          for line_number, raw_line in enumerate(Path("rules.txt").read_text().splitlines(), 1):
+              entry = raw_line.strip()
+              if not entry or entry.startswith("#"):
+                  continue
+
+              if entry.startswith("regex:"):
+                  pattern = entry.removeprefix("regex:").strip()
+                  if not pattern:
+                      raise SystemExit(f"rules.txt:{line_number}: regex pattern is empty")
+                  domain_regex.append(pattern)
+                  continue
+
+              try:
+                  if "/" in entry:
+                      ip_cidrs.append(str(ipaddress.ip_network(entry)))
+                  else:
+                      address = ipaddress.ip_address(entry)
+                      ip_cidrs.append(f"{address}/{address.max_prefixlen}")
+              except ValueError as error:
+                  raise SystemExit(f"rules.txt:{line_number}: invalid rule {entry!r}: {error}")
+
+          rule = {}
+          if ip_cidrs:
+              rule["ip_cidr"] = ip_cidrs
+          if domain_regex:
+              rule["domain_regex"] = domain_regex
+          if not rule:
+              raise SystemExit("rules.txt contains no rules")
+
+          Path("rules.json").write_text(
+              json.dumps({"version": 1, "rules": [rule]}, indent=2) + "\n"
+          )
+          PY
+
+      - name: Compile rule-set
+        run: "$RUNNER_TEMP/sing-box rule-set compile --output bypass.srs rules.json"
+
+      - name: Commit and push generated SRS
+        run: |
+          git config user.name "GitHub Actions Bot"
+          git config user.email "actions@github.com"
           git add bypass.srs
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update bypass.srs" && git push)
+          if git diff --cached --quiet; then
+            echo "bypass.srs is already up to date"
+          else
+            git commit -m "Auto-update bypass.srs"
+            git push
+          fi
