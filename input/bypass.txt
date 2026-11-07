@@ -1,0 +1,8 @@
+keyword:yandex
+keyword:tiktok
+regex:.*\.(ru)$
+regex:.*(userplay|malsed|interkh|ceramet|myangular)\.(live|site|com|net|org|online)$
+regex:.*(microsoft|windows|windowsupdate|apple|icloud|msn|bing|android|gvt1|gvt2|nvidia|geforce)\.(com)$
+regex:.*(gstatic|measurement|kaspersky|appsflyersdk|paywb|ozonusercontent|app-analytics-services|moengage|uni|x5|x5static|yastatic|edemrf|mycdn|vkuser|userapi|vk-.*|medrocket|ipify|vigo|ngenix|bumlam|lenta|mowell|clstorage)\.(com|net|me|rest|org|tech)$
+regex:.*(vk|mail|2gis|avito|habr|okko|ivi)\.(com|tv|st)$
+regex:.*(xiaomi|miui|mi-img|mioffice)\.(com|cn|net)$

@@ -61,6 +61,7 @@ jobs:
               for index, source in enumerate(source_files):
                   ip_cidrs = []
                   domain_regex = []
+                  domain_keywords = []
 
                   for line_number, raw_line in enumerate(
                       source.read_text(encoding="utf-8").splitlines(), 1
@@ -76,6 +77,15 @@ jobs:
                                   f"{source}:{line_number}: regex pattern is empty"
                               )
                           domain_regex.append(pattern)
+                          continue
+
+                      if entry.startswith("keyword:"):
+                          keyword = entry.removeprefix("keyword:").strip()
+                          if not keyword:
+                              raise SystemExit(
+                                  f"{source}:{line_number}: domain keyword is empty"
+                              )
+                          domain_keywords.append(keyword)
                           continue
 
                       try:
@@ -97,6 +107,8 @@ jobs:
                       rule["ip_cidr"] = ip_cidrs
                   if domain_regex:
                       rule["domain_regex"] = domain_regex
+                  if domain_keywords:
+                      rule["domain_keyword"] = domain_keywords
                   if not rule:
                       raise SystemExit(f"{source}: contains no rules")
 
