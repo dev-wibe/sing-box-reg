@@ -1,10 +1,10 @@
-name: Compile sing-box SRS
+name: Compile sing-box rule sets
 
 on:
   push:
     branches: [main, master]
     paths:
-      - rules.txt
+      - input/**/*.txt
       - .github/workflows/convert.yml
   workflow_dispatch:
 
@@ -28,61 +28,111 @@ jobs:
       - name: Install sing-box
         run: GOBIN="$RUNNER_TEMP" go install github.com/sagernet/sing-box/cmd/sing-box@latest
 
-      - name: Convert rules.txt to sing-box rule-set
+      - name: Convert input TXT files to SRS
+        env:
+          SING_BOX: ${{ runner.temp }}/sing-box
         run: |
           python3 - <<'PY'
           import ipaddress
           import json
+          import os
+          import subprocess
+          import tempfile
           from pathlib import Path
 
-          ip_cidrs = []
-          domain_regex = []
+          input_dir = Path("input")
+          output_dir = Path("release/sing-box")
+          source_files = sorted(input_dir.rglob("*.txt")) if input_dir.exists() else []
+          if not source_files:
+              raise SystemExit("No .txt files found in input/")
 
-          for line_number, raw_line in enumerate(Path("rules.txt").read_text().splitlines(), 1):
-              entry = raw_line.strip()
-              if not entry or entry.startswith("#"):
-                  continue
+          expected_outputs = {
+              source.relative_to(input_dir).with_suffix(".srs")
+              for source in source_files
+          }
+          output_dir.mkdir(parents=True, exist_ok=True)
 
-              if entry.startswith("regex:"):
-                  pattern = entry.removeprefix("regex:").strip()
-                  if not pattern:
-                      raise SystemExit(f"rules.txt:{line_number}: regex pattern is empty")
-                  domain_regex.append(pattern)
-                  continue
+          for old_output in output_dir.rglob("*.srs"):
+              if old_output.relative_to(output_dir) not in expected_outputs:
+                  old_output.unlink()
 
-              try:
-                  if "/" in entry:
-                      ip_cidrs.append(str(ipaddress.ip_network(entry)))
-                  else:
-                      address = ipaddress.ip_address(entry)
-                      ip_cidrs.append(f"{address}/{address.max_prefixlen}")
-              except ValueError as error:
-                  raise SystemExit(f"rules.txt:{line_number}: invalid rule {entry!r}: {error}")
+          with tempfile.TemporaryDirectory() as temp_dir:
+              temp_dir = Path(temp_dir)
+              for index, source in enumerate(source_files):
+                  ip_cidrs = []
+                  domain_regex = []
 
-          rule = {}
-          if ip_cidrs:
-              rule["ip_cidr"] = ip_cidrs
-          if domain_regex:
-              rule["domain_regex"] = domain_regex
-          if not rule:
-              raise SystemExit("rules.txt contains no rules")
+                  for line_number, raw_line in enumerate(
+                      source.read_text(encoding="utf-8").splitlines(), 1
+                  ):
+                      entry = raw_line.strip()
+                      if not entry or entry.startswith("#"):
+                          continue
 
-          Path("rules.json").write_text(
-              json.dumps({"version": 1, "rules": [rule]}, indent=2) + "\n"
-          )
+                      if entry.startswith("regex:"):
+                          pattern = entry.removeprefix("regex:").strip()
+                          if not pattern:
+                              raise SystemExit(
+                                  f"{source}:{line_number}: regex pattern is empty"
+                              )
+                          domain_regex.append(pattern)
+                          continue
+
+                      try:
+                          if "/" in entry:
+                              ip_cidrs.append(str(ipaddress.ip_network(entry)))
+                          else:
+                              address = ipaddress.ip_address(entry)
+                              ip_cidrs.append(
+                                  f"{address}/{address.max_prefixlen}"
+                              )
+                      except ValueError as error:
+                          raise SystemExit(
+                              f"{source}:{line_number}: invalid rule "
+                              f"{entry!r}: {error}"
+                          )
+
+                  rule = {}
+                  if ip_cidrs:
+                      rule["ip_cidr"] = ip_cidrs
+                  if domain_regex:
+                      rule["domain_regex"] = domain_regex
+                  if not rule:
+                      raise SystemExit(f"{source}: contains no rules")
+
+                  source_json = temp_dir / f"{index}.json"
+                  source_json.write_text(
+                      json.dumps(
+                          {"version": 1, "rules": [rule]}, indent=2
+                      ) + "\n",
+                      encoding="utf-8",
+                  )
+
+                  relative_output = source.relative_to(input_dir).with_suffix(".srs")
+                  output = output_dir / relative_output
+                  output.parent.mkdir(parents=True, exist_ok=True)
+                  subprocess.run(
+                      [
+                          os.environ["SING_BOX"],
+                          "rule-set",
+                          "compile",
+                          "--output",
+                          str(output),
+                          str(source_json),
+                      ],
+                      check=True,
+                  )
+                  print(f"Compiled {source} -> {output}")
           PY
 
-      - name: Compile rule-set
-        run: "$RUNNER_TEMP/sing-box rule-set compile --output bypass.srs rules.json"
-
-      - name: Commit and push generated SRS
+      - name: Commit and push generated SRS files
         run: |
           git config user.name "GitHub Actions Bot"
           git config user.email "actions@github.com"
-          git add bypass.srs
+          git add -A input release/sing-box rules.txt bypass.srs
           if git diff --cached --quiet; then
-            echo "bypass.srs is already up to date"
+            echo "Generated SRS files are already up to date"
           else
-            git commit -m "Auto-update bypass.srs"
+            git commit -m "Update compiled sing-box rule sets"
             git push
           fi
